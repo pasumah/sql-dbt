@@ -1,0 +1,34 @@
+name: dbt CI
+
+on: [pull_request]
+
+jobs:
+  dbt-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Needed for full git diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install dbt-core gitpython
+
+      - name: Detect Changes
+        run: python detect_changes.py
+
+      - name: Compile main branch for state
+        run: |
+          git checkout origin/main
+          dbt compile --target ci --state artifacts/main_state/
+
+      - name: Run only changed models + downstream
+        run: |
+          git checkout -
+          dbt deps
+          dbt run --select state:modified+ --state artifacts/main_state/
+          dbt test --select state:modified+ --state artifacts/main_state/
